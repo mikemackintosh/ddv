@@ -1,2 +1,2 @@
 runtime: php55
-check: exec php -f dependencyvalidator.php $2
+check: exec php -f lib/dependencyvalidator.php $2
