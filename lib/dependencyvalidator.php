@@ -172,7 +172,7 @@ class DependencyValidator{
     public function report( ){
 
         "Create dir if it does not exist";
-        $path = './reports/'.$this->url.'/' ;
+        $path = '../reports/'.$this->url.'/' ;
         if (!file_exists($path )) {
             mkdir($path, 0777, true);
         }
