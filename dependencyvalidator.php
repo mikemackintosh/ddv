@@ -85,26 +85,31 @@ class DependencyValidator{
             
             if($intensity == 1 ){
                 if( preg_match_all("`<{$tag_type}.*?(href|src)=['\"](.*?)['\"].*?>`mi", $this->contents, $matches)){
-                    $contents = $matches;
+                    array_push($contents, $matches);
                 }
             }
 
             if($intensity == 3 ){
                 if( preg_match_all("`<{$tag_type}.*?(href|src)=['\"](.*?)['\"].*?>`mi", $this->contents, $matches)){
-                    $tag = $matches;
+                    array_push($contents, $matches);
                 }
                 if( preg_match_all("`<{$tag_type}>(.*?)<`mi", $this->contents, $matches)){
-                    $body = $matches;
+                    array_push($contents, $matches);
                 }
 
-                $contents = $tag + $body;
             }
+    
+            $contents = $contents[0];
         }
+
 
         return $this;
     }
 
-    public function correlate(){
+     /**
+      * 
+      **/
+     public function correlate(){
         
         "How many targets can we hit?";
         $target_count = 0;
@@ -187,6 +192,8 @@ class DependencyValidator{
         // Content
         $contents = curl_exec( $ch );
         $hash = sha1($contents);
+        
+        echo "$target = $hash".PHP_EOL;
 
         // Close curl connection
         curl_close ( $ch );   
@@ -210,7 +217,7 @@ else{
 foreach( $domains as $domain ){
     $assets = (new DependencyValidator( $domain ))->extract( 3 );
     print_r( $assets->correlate() ); 
-    $assets->report('./'.time().'.json');
+    $assets->report('./reports/'.time().'.json');
 }
 
 // Prints all the remote files accessed
