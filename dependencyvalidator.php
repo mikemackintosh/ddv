@@ -1,6 +1,10 @@
 #!/usr/bin/env php 
 <?php 
 
+define('LOCAL', 0);
+define('REMOTE', 1);
+define('RESPECT_REMOTE', 2);
+
 /** 
  * 
  */
@@ -130,6 +134,9 @@ class DependencyValidator{
 
                 "Remove duplicates and loop through targets ";
                 foreach( array_unique($targets) as $target ){
+
+                    $type = null;
+
                     $point_of_interest = parse_url($target)['path'];
                     
                     "Find out if it is a file or a destination";
@@ -139,15 +146,18 @@ class DependencyValidator{
 
                         if( preg_match("`^/[a-z0-9]`", $target) ){
                             echo "    [d] {$target} is local".PHP_EOL;
+                            $type = LOCAL;
                         }
                         elseif( preg_match("`^//[a-z0-9]`", $target)){
                             echo "    [d] {$target} is respectfully remote".PHP_EOL;
+                            $type = RESPECT_REMOTE;
                         }
                         elseif( preg_match("`^http(?)://[a-z0-9]`", $target)){
                             echo "    [d] {$target} is strict remote".PHP_EOL;
+                            $type = REMOTE;
                         }
 
-                        $this->hashes[$target] = [ 'type' => $tag_type, 'timestamp' => time(), 'hash' => $this->gensha1( $target ) ];
+                        $this->hashes[$target] = [ 'type' => $tag_type, 'timestamp' => time(), 'hash' => $this->gensha1( $target, $type ) ];
                     }
                 }
             }
@@ -161,7 +171,7 @@ class DependencyValidator{
      **/
     public function report( $file ){
 
-        $contents = json_encode($this->hashes);
+        $contents = json_encode([ 'url' => $this->url, 'hashes' => $this->hashes ]);
 
         if(file_put_contents($file, $contents)){
             print_r($content);
@@ -171,14 +181,28 @@ class DependencyValidator{
 
     } 
 
-    private function gensha1( $target ){
+    private function gensha1( $target, $type ){
+
+        if( $type == LOCAL ){
+            $url = $this->url.$target;
+        }
+        elseif( $type == REMOTE ){
+            $url = $target;
+        }
+        elseif( $type == RESPECT_REMOTE ){
+            $url = $target;
+        }
+        else{
+            die('Error!');
+        }
+
         // Create temp curl cookie
         $cookie = tempnam ("/tmp", "CURLTARGETCOOKIE");
 
         // Create curl connection
         $ch = curl_init();
         curl_setopt( $ch, CURLOPT_USERAGENT, "DDV - SecurityProfiler - Referenced By: {$target}" );
-        curl_setopt( $ch, CURLOPT_URL, $target );
+        curl_setopt( $ch, CURLOPT_URL, $url );
         curl_setopt( $ch, CURLOPT_COOKIEJAR, $cookie );
         curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true );
         curl_setopt( $ch, CURLOPT_ENCODING, "" );
@@ -193,7 +217,7 @@ class DependencyValidator{
         $contents = curl_exec( $ch );
         $hash = sha1($contents);
         
-        echo "$target = $hash".PHP_EOL;
+        echo "$url = $hash".PHP_EOL;
 
         // Close curl connection
         curl_close ( $ch );   
