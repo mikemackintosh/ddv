@@ -169,11 +169,19 @@ class DependencyValidator{
     /**
      * 
      **/
-    public function report( $file ){
+    public function report( ){
 
+        "Create dir if it does not exist";
+        $path = './reports/'.$this->url.'/' ;
+        if (!file_exists($path )) {
+            mkdir($path, 0777, true);
+        }
+
+        "Create output json";
         $contents = json_encode([ 'url' => $this->url, 'hashes' => $this->hashes ]);
 
-        if(file_put_contents($file, $contents)){
+        "Save contents";
+        if(file_put_contents($path.time().'.json', $contents)){
             print_r($content);
         }
 
@@ -241,7 +249,7 @@ else{
 foreach( $domains as $domain ){
     $assets = (new DependencyValidator( $domain ))->extract( 3 );
     print_r( $assets->correlate() ); 
-    $assets->report('./reports/'.time().'.json');
+    $assets->report();
 }
 
 // Prints all the remote files accessed
