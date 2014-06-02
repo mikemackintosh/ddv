@@ -12,6 +12,7 @@ class DependencyValidator{
     private
         $content,
         $response,
+        $hashes = [],
         $assets = [
             'a'      => [],
             'link'   => [],
@@ -104,18 +105,33 @@ class DependencyValidator{
     }
 
     public function correlate(){
+        
+        "How many targets can we hit?";
+        $target_count = 0;
+        $target_hit_count = 0;
+
         foreach( $this->assets as $tag_type => $contents ){
             if( sizeof( $contents ) > 0){
                 echo "  [i] Injesting {$tag_type}" . PHP_EOL;
+
                 if( array_key_exists(2, $contents)){
                     $targets = $contents[2];
                 }
                 else{
                     $targets = $contents[1];
                 }
+                
+                $target_hit_count += sizeof($targets);
 
-                foreach( $targets as $target ){
-                    #if( preg_match("`.+?((\/).+)\..*$`", $target )){
+                "Remove duplicates and loop through targets ";
+                foreach( array_unique($targets) as $target ){
+                    $point_of_interest = parse_url($target)['path'];
+                    
+                    "Find out if it is a file or a destination";
+                    if(strstr($point_of_interest, ".")){
+                        
+                        $target_count++;
+
                         if( preg_match("`^/[a-z0-9]`", $target) ){
                             echo "    [d] {$target} is local".PHP_EOL;
                         }
@@ -125,13 +141,30 @@ class DependencyValidator{
                         elseif( preg_match("`^http(?)://[a-z0-9]`", $target)){
                             echo "    [d] {$target} is strict remote".PHP_EOL;
                         }
-                        
-                        //$this->gensha1( $target );
-                    #}
+
+                        $this->hashes[$target] = [ 'type' => $tag_type, 'timestamp' => time(), 'hash' => $this->gensha1( $target ) ];
+                    }
                 }
             }
         }
+
+        return [$target_hit_count, $target_count];
     }
+
+    /**
+     * 
+     **/
+    public function report( $file ){
+
+        $contents = json_encode($this->hashes);
+
+        if(file_put_contents($file, $contents)){
+            print_r($content);
+        }
+
+        return false;
+
+    } 
 
     private function gensha1( $target ){
         // Create temp curl cookie
@@ -153,13 +186,13 @@ class DependencyValidator{
 
         // Content
         $contents = curl_exec( $ch );
-        print_r($contents);
-
-        // Response Headers
-        $response = curl_getinfo( $ch );
+        $hash = sha1($contents);
 
         // Close curl connection
-        curl_close ( $ch );       
+        curl_close ( $ch );   
+        
+        // Return Hash
+        return $hash;  
     }
 }
 
@@ -176,7 +209,8 @@ else{
 /* Loop through domains */
 foreach( $domains as $domain ){
     $assets = (new DependencyValidator( $domain ))->extract( 3 );
-    $assets->correlate(); 
+    print_r( $assets->correlate() ); 
+    $assets->report('./'.time().'.json');
 }
 
 // Prints all the remote files accessed
