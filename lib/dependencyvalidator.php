@@ -1,6 +1,7 @@
 #!/usr/bin/env php 
 <?php 
 
+define('PROJECT_ROOT', dirname(dirname(__FILE__)))';
 define('LOCAL', 0);
 define('REMOTE', 1);
 define('RESPECT_REMOTE', 2);
@@ -172,7 +173,8 @@ class DependencyValidator{
     public function report( ){
 
         "Create dir if it does not exist";
-        $path = '../reports/'.$this->url.'/' ;
+        $path = PROJECT_ROOT.'/reports/'.$this->url.'/' ;
+        echo $path;
         if (!file_exists($path )) {
             mkdir($path, 0777, true);
         }
