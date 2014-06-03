@@ -1,7 +1,7 @@
 #!/usr/bin/env php 
 <?php 
 
-define('PROJECT_ROOT', dirname(dirname(__FILE__)))';
+define('PROJECT_ROOT', dirname(dirname(__FILE__)));
 define('LOCAL', 0);
 define('REMOTE', 1);
 define('RESPECT_REMOTE', 2);
