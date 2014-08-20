@@ -1,20 +1,22 @@
-#!/usr/bin/env php 
-<?php 
+#!/usr/bin/env php
+<?php
 
 define('PROJECT_ROOT', dirname(dirname(__FILE__)));
 define('LOCAL', 0);
 define('REMOTE', 1);
 define('RESPECT_REMOTE', 2);
 
-/** 
- * 
+/**
+ *
  */
 class DependencyValidator{
 
     public
+        $tags,
         $url;
 
     private
+        $unique,
         $content,
         $response,
         $hashes = [],
@@ -31,26 +33,36 @@ class DependencyValidator{
      *
      * @param [type] $url [description]
      */
-    public function __construct( $url ){
+    public function __construct( $url, $tags = NULL, $unique = false ){
+
+        // Set some ENV stuff
+        $this->unique = false;
+        $this->tags = $tags;
+
+        // Get parts of the URL
+        $parts = parse_url($url);
+        if(!array_key_exists('scheme', $parts) && array_key_exists('path', $parts)){
+            $parts['host'] = $parts['path'];
+        }
 
         echo "Scanning {$url}".PHP_EOL;
 
-        $http = @fsockopen( $url, 80, $errno, $errstr, 3);
+        $http = @fsockopen( $parts['host'], 80, $errno, $errstr, 3);
         if( !$http ){
-            echo "  ! Failed to connect to $url:80" . PHP_EOL;
+            echo "  ! Failed to connect to {$parts['host']}:80" . PHP_EOL;
         } else {
-            echo "  - Connected to $url:80" . PHP_EOL;
+            echo "  - Connected to {$parts['host']}:80" . PHP_EOL;
             fclose( $http );
         }
 
-        $https = @fsockopen( $url, 443, $errno, $errstr, 3);
+        $https = @fsockopen( $parts['host'], 443, $errno, $errstr, 3);
         if( !$https ){
-            echo "  ! Failed to connect to $url:443" . PHP_EOL;
+            echo "  ! Failed to connect to {$parts['host']}:443" . PHP_EOL;
         } else {
-            echo "  - Connected to $url:443" . PHP_EOL;
+            echo "  - Connected to {$parts['host']}:443" . PHP_EOL;
             fclose( $https );
         }
-        
+
         // Assign object to url
         $this->url = $url;
 
@@ -73,7 +85,7 @@ class DependencyValidator{
 
         // Content
         $this->contents = curl_exec( $ch );
-        
+
         // Response Headers
         $this->response = curl_getinfo( $ch );
 
@@ -83,11 +95,11 @@ class DependencyValidator{
     }
 
     /**
-     * 
+     *
      **/
     public function extract( $intensity = 3 ){
         foreach( $this->assets as $tag_type => &$contents ){
-            
+
             if($intensity == 1 ){
                 if( preg_match_all("`<{$tag_type}.*?(href|src)=['\"](.*?)['\"].*?>`mi", $this->contents, $matches)){
                     array_push($contents, $matches);
@@ -103,7 +115,7 @@ class DependencyValidator{
                 }
 
             }
-    
+
             $contents = $contents[0];
         }
 
@@ -112,17 +124,17 @@ class DependencyValidator{
     }
 
      /**
-      * 
+      *
       **/
      public function correlate(){
-        
+
         "How many targets can we hit?";
         $target_count = 0;
         $target_hit_count = 0;
 
         foreach( $this->assets as $tag_type => $contents ){
             if( sizeof( $contents ) > 0){
-                echo "  [i] Injesting {$tag_type}" . PHP_EOL;
+                echo "  [i] Injesting '{$tag_type}' tags" . PHP_EOL;
 
                 if( array_key_exists(2, $contents)){
                     $targets = $contents[2];
@@ -130,7 +142,7 @@ class DependencyValidator{
                 else{
                     $targets = $contents[1];
                 }
-                
+
                 $target_hit_count += sizeof($targets);
 
                 "Remove duplicates and loop through targets ";
@@ -139,10 +151,10 @@ class DependencyValidator{
                     $type = null;
 
                     $point_of_interest = parse_url($target)['path'];
-                    
+
                     "Find out if it is a file or a destination";
                     if(strstr($point_of_interest, ".")){
-                        
+
                         $target_count++;
 
                         if( preg_match("`^/[a-z0-9]`", $target) ){
@@ -168,7 +180,7 @@ class DependencyValidator{
     }
 
     /**
-     * 
+     *
      **/
     public function report( ){
 
@@ -189,7 +201,7 @@ class DependencyValidator{
 
         return false;
 
-    } 
+    }
 
     private function gensha1( $target, $type ){
 
@@ -226,16 +238,22 @@ class DependencyValidator{
         // Content
         $contents = curl_exec( $ch );
         $hash = sha1($contents);
-        
+
         echo "$url = $hash".PHP_EOL;
 
         // Close curl connection
-        curl_close ( $ch );   
-        
+        curl_close ( $ch );
+
         // Return Hash
-        return $hash;  
+        return $hash;
     }
 }
+
+// Null tags
+$tags = null;
+
+// Unique tags
+$unique = false;
 
 /* Check for Domains */
 if( !isset($_ENV['ROCK_ARGS'] )){
@@ -243,14 +261,31 @@ if( !isset($_ENV['ROCK_ARGS'] )){
     die(1);
 }
 else{
-    $domains = explode(" ", $_ENV['ROCK_ARGS']);
+    preg_match('`\s?-t\s?([a-z\d,]+)(\s|$)`', $_ENV['ROCK_ARGS'], $tags);
+    if(array_key_exists(1, $tags)){
+        $_ENV['ROCK_ARGS'] = str_replace($tags[0], '', $_ENV['ROCK_ARGS']);
+        $tags = explode(",", $tags[1]);
+    }
+    
+    if(preg_match('`\s-u(\s|$)`', $_ENV['ROCK_ARGS'])){
+        $_ENV['ROCK_ARGS'] = str_replace('-u', '', $_ENV['ROCK_ARGS']); 
+        $unique = true;       
+    }
+
+    $domains = explode(" ", preg_replace('`\s+`', ' ', $_ENV['ROCK_ARGS']));
     echo "Checking the following domains: ". implode(", ", $domains) . PHP_EOL;
+
+    if(isset($tags)){
+        echo "And looking for ". implode(", ", $tags). " tags".PHP_EOL;
+    }
+
+    echo PHP_EOL;
 }
 
 /* Loop through domains */
 foreach( $domains as $domain ){
-    $assets = (new DependencyValidator( $domain ))->extract( 3 );
-    print_r( $assets->correlate() ); 
+    $assets = (new DependencyValidator( $domain, $tags, $unique ))->extract( 3 );
+    print_r( $assets->correlate() );
     $assets->report();
 }
 
